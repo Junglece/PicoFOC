@@ -1,33 +1,50 @@
-# Auto detect text files and force LF normalization
+# Auto detect text files and normalize to LF
 * text=auto
 
-# Source code - LF
-*.c text eol=lf
-*.h text eol=lf
-*.cpp text eol=lf
-*.hpp text eol=lf
-*.s text eol=lf
-*.py text eol=lf
+# --- Source code ---
+*.c    text eol=lf
+*.h    text eol=lf
+*.cpp  text eol=lf
+*.hpp  text eol=lf
+*.s    text eol=lf
+*.py   text eol=lf
 
-# Config files - LF
-*.ioc text eol=lf
-*.sct text eol=lf
-*.ld text eol=lf
-*.uvprojx text eol=lf
-*.uvoptx text eol=lf
-*.uvguix.* text eol=lf
+# --- Config / project files ---
+*.ioc     text eol=lf
+*.sct     text eol=lf
+*.ld         text eol=lf
+*.mxproject  text eol=lf
+*.uvprojx    text eol=lf
+*.uvoptx  text eol=lf
 
-# Docs - LF
-*.md text eol=lf
+# --- Documentation ---
+*.md  text eol=lf
 *.txt text eol=lf
+*.htm text eol=lf
 
-# Binary files
-*.axf binary
-*.o binary
-*.hex binary
-*.map binary
-*.crf binary
-*.dep binary
-*.d binary
-*.lnp binary
-*.htm binary
+# --- Generic build artifacts (text) ---
+*.map text eol=lf
+*.dep text eol=lf
+*.d   text eol=lf
+
+# --- Binary files (must not be text) ---
+*.axf  binary
+*.o    binary
+*.hex  binary
+*.crf  binary
+*.lnp  binary
+
+# --- Hardware / mechanical ---
+*.step binary
+*.stl  binary
+*.pdf  binary
+*.zip  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.dxf  binary
+*.ger  binary
+*.gbr  binary
+
+# --- Toolchain caches ---
+*.pyc binary
