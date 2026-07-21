@@ -9,9 +9,9 @@
  * 对比差分法：速度不会因单次角度噪声跳变而剧烈波动。
  *
  * 增益选取建议（1kHz 控制环）：
- *   中等滤波：l1=0.14f,  l2=100.0f,  speed_max=10000
- *   重滤波：  l1=0.07f,  l2=25.0f,   speed_max=10000
- *   快响应：  l1=0.28f,  l2=400.0f,  speed_max=10000
+ *   中等滤波：l1=0.10f,  l2=2.0f,  speed_max=10000
+ *   重滤波：  l1=0.05f,  l2=0.5f,  speed_max=10000
+ *   快响应：  l1=0.20f,  l2=5.0f,  speed_max=10000
  *
  * 用法：
  *   ObserverLuenberger_Config cfg = {

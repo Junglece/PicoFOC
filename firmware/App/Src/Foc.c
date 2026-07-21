@@ -123,7 +123,13 @@ void FOC_UpdateSensor(FOC_t *foc)
     float raw = foc->sensor->read_angle(foc->sensor->ctx);
     foc->observer->update(foc->observer->ctx, raw);
 
-    /* 从观测器获取滤波后位置和速度 */
+    /* 位置和速度都来自观测器
+     *
+     * 之前在 原始值（噪声→微分抖）和 观测值（滞后→过冲）间反复横跳。
+     * 现在：提高 l1 让观测器快速收敛，控制滞后在 1~2ms 内，
+     * 同时观测器内置的一阶滞后本身就在滤除传感器噪声，
+     * 比原始值直通更适合进 PD 控制环的微分项。
+     */
     foc->mech_angle = foc->observer->get_position(foc->observer->ctx);
     foc->speed      = foc->observer->get_velocity(foc->observer->ctx);
 

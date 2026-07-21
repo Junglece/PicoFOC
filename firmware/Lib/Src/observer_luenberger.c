@@ -41,8 +41,12 @@ static void luenberger_update(void *ctx, float raw_angle_deg)
     /* 误差 = 实测 - 估计（角度取最短路径） */
     float error = ANGLE_limit(raw_angle_deg - c->x1_hat, 360.0f, -180.0f, 180.0f);
 
-    /* 位置估计：模型预测 + 误差校正 */
-    c->x1_hat += c->Ts * c->x2_hat + c->l1 * error;
+    /* 位置估计：模型预测 + 误差校正
+     *
+     * 注意：x2_hat 单位为 rpm，需先转为 deg/s（×6）再乘 Ts 得到角度增量：
+     *   rpm × (360°/60s) = deg/s,  deg/s × Ts = deg
+     */
+    c->x1_hat += c->Ts * c->x2_hat * 6.0f + c->l1 * error;
     c->x1_hat  = ANGLE_limit(c->x1_hat, 360.0f, 0.0f, 360.0f);
 
     /* 速度估计：误差校正 */

@@ -31,9 +31,10 @@
 #include "motor_config.h"
 #include "flash_storage.h"
 #include "led_indicator.h"
-#include "observer_diff.h"       /* 默认使用差分法观测器 */
-/* 换龙伯格时取消下面这行的注释，同时注释掉上面 #include "observer_diff.h" */
-/* #include "observer_luenberger.h" */
+/* 差分法观测器（角度直通，速度差分） */
+/* #include "observer_diff.h" */
+/* 龙伯格观测器（二阶模型，同时滤波位置和速度） */
+#include "observer_luenberger.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -147,8 +148,14 @@ int main(void)
    * ================================================================ */
   NvStorage_t flash = FlashStorage_Create(0x0800FC00, 0xF0C0F0C0, 1024);
 
-  /* 创建角度/速度观测器（默认用差分法，换龙伯格就把下一行换成 ObserverLuenberger_Create） */
-  Observer_t angle_obs = ObserverDiff_Create(FOC_RATE_HZ);
+  /* 创建角度/速度观测器（使用龙伯格观测器，同时滤波位置和速度） */
+  ObserverLuenberger_Config obs_cfg = {
+      .rate_hz   = FOC_RATE_HZ,
+      .l1        = 0.5f,        /* 位置校正增益——提高跟踪速度，控制滞后在 ~2ms */
+      .l2        = 1.0f,        /* 速度校正增益——轻柔估计，不给速度环注入抖动 */
+      .speed_max = 10000.0f,    /* 速度限幅 (rpm) */
+  };
+  Observer_t angle_obs = ObserverLuenberger_Create(&obs_cfg);
 
   FOC_Init(&Motor, &sensor, &pwm, &cfg, &flash, &angle_obs);
 
