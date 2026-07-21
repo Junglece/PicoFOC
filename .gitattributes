@@ -1,0 +1,33 @@
+# Auto detect text files and force LF normalization
+* text=auto
+
+# Source code - LF
+*.c text eol=lf
+*.h text eol=lf
+*.cpp text eol=lf
+*.hpp text eol=lf
+*.s text eol=lf
+*.py text eol=lf
+
+# Config files - LF
+*.ioc text eol=lf
+*.sct text eol=lf
+*.ld text eol=lf
+*.uvprojx text eol=lf
+*.uvoptx text eol=lf
+*.uvguix.* text eol=lf
+
+# Docs - LF
+*.md text eol=lf
+*.txt text eol=lf
+
+# Binary files
+*.axf binary
+*.o binary
+*.hex binary
+*.map binary
+*.crf binary
+*.dep binary
+*.d binary
+*.lnp binary
+*.htm binary

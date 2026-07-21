@@ -1,0 +1,70 @@
+# ============================================================
+# Firmware - Keil MDK-ARM build outputs
+# ============================================================
+firmware/**/*.o
+firmware/**/*.d
+firmware/**/*.crf
+firmware/**/*.htm
+firmware/**/*.dep
+firmware/**/*.map
+firmware/**/*.lst
+firmware/**/*.iex
+firmware/**/*.sct
+firmware/**/*.scvd
+firmware/**/*.bak
+firmware/**/*.hex
+firmware/**/*.axf
+firmware/**/*.bin
+firmware/**/*.elf
+firmware/**/JLinkLog.txt
+firmware/**/JLinkSettings.ini
+firmware/**/DebugConfig/
+firmware/**/Listings/
+firmware/**/Objects/
+firmware/**/*.uvguix.*
+firmware/**/*.uvoptx
+firmware/**/*.uvproj.bak
+
+# ============================================================
+# Firmware - CubeMX extras (user can regenerate)
+# ============================================================
+firmware/Drivers/CMSIS/DSP_Lib/
+firmware/Drivers/CMSIS/Documentation/
+firmware/Drivers/CMSIS/NN/
+firmware/Drivers/CMSIS/RTOS/
+firmware/Drivers/CMSIS/RTOS2/
+firmware/Drivers/CMSIS/Template/
+firmware/Middlewares/
+
+# ============================================================
+# Hardware - PCB design backups
+# ============================================================
+hardware/**/*.bak
+hardware/**/backups/
+hardware/**/archive/
+hardware/**/__Old/
+hardware/**/*-old.*
+
+# ============================================================
+# Mechanical - CAD software temp / backups only
+# (STL/STEP/STP files are deliverables, keep them in repo)
+# ============================================================
+mechanical/**/renders/
+mechanical/**/_history/
+mechanical/**/*.f3d.bak
+mechanical/**/__Old/
+
+# ============================================================
+# IDE / OS
+# ============================================================
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# ============================================================
+# Claude AI (per-user, not part of project)
+# ============================================================
+.claude/
