@@ -23,7 +23,7 @@ PicoFOC/
 │   └── tools/     辅助脚本
 │
 ├── hardware/      PCB 设计 (EasyEDA / 立创 EDA)
-├── mechanical/    3D 外壳（待补充）
+├── mechanical/    3D 打印外壳（适配 2804 电机）
 ├── LICENSE        MIT License
 └── README.md
 ```
@@ -52,6 +52,20 @@ PicoFOC/
 - **电源系统**：12V 直流输入 → DCDC 12V 转 5V → LDO 5V 转 3.3V 全板供电；**无电源防反接保护**
 
 详见 [hardware/README.md](hardware/README.md)。
+
+## 机械
+
+3D 打印外壳，适配 2804 电机，包含三大部件：
+
+- **磁环座** —— 固定径向充磁磁环，配合 AS5600 编码器
+- **PCB外壳1** —— 下半部分，连接 PCB 与电机
+- **PCB外壳2** —— 上半部分，PCB 上盖
+
+螺丝规格：M3 / M2.5（平头）/ M2（平头）
+
+如需适配不同电机，需自行修改外壳模型。
+
+详见 [mechanical/README.md](mechanical/README.md)。
 
 ## 许可证
 
