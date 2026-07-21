@@ -8,7 +8,7 @@ A compact STM32F103 BLDC FOC motor drive platform — firmware, PCB, and enclosu
 
 ---
 
-## 项目组成
+## 项目组成 / Structure
 
 ```
 PicoFOC/
@@ -28,7 +28,7 @@ PicoFOC/
 └── README.md
 ```
 
-## 固件
+## 固件 / Firmware
 
 四层架构：**LIB**（纯数学，零硬件依赖）→ **BSP**（接口 + 实现）→ **DRV**（HAL 封装）→ **APP**（业务逻辑）。
 
@@ -36,24 +36,26 @@ PicoFOC/
 - CAN 1 Mbps + UART 115200 双协议通信
 - 双观测器方案可选：差分观测器 / 龙伯格观测器
 
+**Firmware:** 4-layer architecture (LIB→BSP→DRV→APP). STM32F103C8T6, bare-metal interrupt-driven, 1 kHz control loop. Dual CAN + UART communication. Optional difference / Luenberger observers.
+
 详见 [firmware/README.md](firmware/README.md)。
 
-## 硬件
+## 硬件 / Hardware
 
-- **主控**：STM32F103C8T6
-- **驱动芯片**：MP6541（内置三相 MOS 功率桥、驱动电路与电流采样）
-- **编码器**：AS5600（I2C，12 位磁编码器）
-- **CAN 收发器**：TJA1051，单路 CAN 外设、双物理接口支持设备串联
-- **终端电阻**：板载可控 120Ω CAN 终端匹配电阻
-- **调试接口**：SWD 下载与在线调试
-- **通信接口**：UART 串口 + CAN
-- **状态指示**：板载 LED 指示灯
-- **接口规格**：PH2.0 / GH1.25
-- **电源系统**：12V 直流输入 → DCDC 12V 转 5V → LDO 5V 转 3.3V 全板供电；**无电源防反接保护**
+- **主控 MCU**：STM32F103C8T6
+- **驱动芯片 Driver**：MP6541（内置三相 MOS 功率桥、驱动电路与电流采样）
+- **编码器 Encoder**：AS5600（I2C，12 位磁编码器）
+- **CAN 收发器 CAN transceiver**：TJA1051，单路 CAN 外设、双物理接口支持设备串联
+- **终端电阻 Termination**：板载可控 120Ω CAN 终端匹配电阻
+- **调试接口 Debug**：SWD 下载与在线调试
+- **通信接口 Communication**：UART 串口 + CAN
+- **状态指示 Status**：板载 LED 指示灯
+- **接口规格 Connectors**：PH2.0 / GH1.25
+- **电源系统 Power**：12V 直流输入 → DCDC 12V 转 5V → LDO 5V 转 3.3V 全板供电；**无电源防反接保护**
 
 详见 [hardware/README.md](hardware/README.md)。
 
-## 机械
+## 机械 / Mechanical
 
 3D 打印外壳，适配 2804 电机，包含三大部件：
 
@@ -61,13 +63,13 @@ PicoFOC/
 - **PCB外壳1** —— 下半部分，连接 PCB 与电机
 - **PCB外壳2** —— 上半部分，PCB 上盖
 
-螺丝规格：M3 / M2.5（平头）/ M2（平头）
+螺丝规格：M3 / M2.5（平头）/ M2（平头）。如需适配不同电机，需自行修改外壳模型。
 
-如需适配不同电机，需自行修改外壳模型。
+**3D-printed enclosure for 2804 motors.** Three parts: magnet holder (for radial magnet + AS5600), lower case (PCB-to-motor), upper case (PCB cover). Screws: M3 / M2.5 (flat-head) / M2 (flat-head). Modify models for different motors.
 
 详见 [mechanical/README.md](mechanical/README.md)。
 
-## 许可证
+## 许可证 / License
 
 MIT License，详见 [LICENSE](LICENSE)。
 
