@@ -43,6 +43,10 @@ static void CANProto_RxCallback(uint32_t id, uint8_t data[8])
     if (id != CAN_CTRL_ID(g_motor_id))
         return;
 
+    /* 校验 mode 字段合法性（0~4），防止总线噪声/异常指令直达 FOC */
+    if (data[0] > 4)
+        return;
+
     MotorMsg_OnFrameReceived(MSG_CH_CAN, data);
 }
 

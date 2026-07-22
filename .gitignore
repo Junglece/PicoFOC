@@ -68,3 +68,4 @@ Thumbs.db
 # Claude AI (per-user, not part of project)
 # ============================================================
 .claude/
+firmware/**/*.lnp

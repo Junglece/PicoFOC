@@ -86,11 +86,13 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-
+  /* 拉低 PB1 —— 关断驱动芯片 MP6541，防止电机继续运行 */
+  GPIOB->BRR = GPIO_PIN_1;
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
     /* USER CODE BEGIN W1_HardFault_IRQn 0 */
+    /* 等待 IWDG ~2s 后自动复位 MCU */
     /* USER CODE END W1_HardFault_IRQn 0 */
   }
 }
@@ -101,11 +103,12 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-
+  GPIOB->BRR = GPIO_PIN_1;
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
   {
     /* USER CODE BEGIN W1_MemoryManagement_IRQn 0 */
+    /* IWDG ~2s 后复位 */
     /* USER CODE END W1_MemoryManagement_IRQn 0 */
   }
 }
@@ -116,11 +119,12 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-
+  GPIOB->BRR = GPIO_PIN_1;
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
   {
     /* USER CODE BEGIN W1_BusFault_IRQn 0 */
+    /* IWDG ~2s 后复位 */
     /* USER CODE END W1_BusFault_IRQn 0 */
   }
 }
@@ -131,11 +135,12 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-
+  GPIOB->BRR = GPIO_PIN_1;
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)
   {
     /* USER CODE BEGIN W1_UsageFault_IRQn 0 */
+    /* IWDG ~2s 后复位 */
     /* USER CODE END W1_UsageFault_IRQn 0 */
   }
 }
@@ -296,6 +301,14 @@ void USART1_IRQHandler(void)
   /* USER CODE BEGIN USART1_IRQn 1 */
 
   /* USER CODE END USART1_IRQn 1 */
+}
+
+/**
+  * @brief CAN1 SCE（状态变更与错误）中断处理
+  */
+void CAN1_SCE_IRQHandler(void)
+{
+  HAL_CAN_IRQHandler(&hcan);
 }
 
 /* USER CODE BEGIN 1 */

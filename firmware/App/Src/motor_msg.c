@@ -69,12 +69,16 @@ static void DecodeCommand(const uint8_t data[8], MotorCommand_t *cmd)
 
     /* ---- 目标值：float 小端 (data[1] ~ data[4]) ---- */
     {
-        union { float f; uint8_t b[4]; } fb;
+        union { float f; uint8_t b[4]; uint32_t u; } fb;
         fb.b[0] = data[1];
         fb.b[1] = data[2];
         fb.b[2] = data[3];
         fb.b[3] = data[4];
         cmd->target = fb.f;
+
+        /* NaN/Inf 保护：若 target 的指数位全为 1，说明是 NaN 或 Inf */
+        if ((fb.u & 0x7F800000UL) == 0x7F800000UL)
+            cmd->target = 0.0f;
     }
 
     /* ---- 位置/速度环 Kp：uint16 小端 (data[5] ~ data[6]) ---- */

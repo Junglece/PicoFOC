@@ -24,13 +24,21 @@
 #include "data_process.h"
 #include "drv_tim.h"
 #include "led_indicator.h"
+#include "main.h"
+
+/** 喂独立看门狗（寄存器直接操作，不依赖 HAL 源文件） */
+#define IWDG_REFRESH()    do { IWDG->KR = 0xAAAAU; } while(0)
 
 void Motor_Loop(void)
 {
     static MotorMode_t   g_mode     = MOTOR_MODE_STANDBY;    /**< 当前运行模式 */
+    static uint16_t      g_comms_timeout = 0;                /**< 通信超时计数器 */
 
     MotorCommand_t       cmd;
     uint8_t              new_cmd    = MotorMsg_PollCommand(&cmd);
+
+    /* 喂独立看门狗 —— 如果此处卡死，IWDG ~2s 后自动复位 MCU */
+    IWDG_REFRESH();      /* 喂独立看门狗 —— IWDG 寄存器直接操作 */
 
     /* ================================================================
      *  第 1 步：处理新指令 → 模式切换 + 参数更新
@@ -40,6 +48,8 @@ void Motor_Loop(void)
      * ================================================================ */
     if (new_cmd)
     {
+        g_comms_timeout = 0;    /* 收到新指令 → 复位通信超时 */
+
         /* ---- 校准中收到待机：中止校准 ---- */
         if (g_mode == MOTOR_MODE_CALIBRATE && cmd.mode == MOTOR_MODE_STANDBY)
         {
@@ -94,6 +104,27 @@ void Motor_Loop(void)
                 break;
             }
         }
+    }
+
+    /* ================================================================
+     *  通信超时保护：超过 100ms 未收到指令 → 自动待机
+     *
+     *  （仅 SPEED / POSITION / TORQUE 模式生效，
+     *   CALIBRATE 模式持续 ~3s 无指令，跳过超时检查）
+     * ================================================================ */
+    if (g_mode == MOTOR_MODE_SPEED || g_mode == MOTOR_MODE_POSITION
+        || g_mode == MOTOR_MODE_TORQUE)
+    {
+        if (++g_comms_timeout >= 100)
+        {
+            FOC_Disable(&Motor);
+            g_mode = MOTOR_MODE_STANDBY;
+            LED_SetPattern(LED_PATTERN_HEARTBEAT);
+        }
+    }
+    else
+    {
+        g_comms_timeout = 0;
     }
 
     /* ================================================================

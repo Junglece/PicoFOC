@@ -57,6 +57,9 @@
 
 /* USER CODE BEGIN PV */
 float vofa_message[8];
+
+/** IWDG 刷新宏 —— 喂独立看门狗（寄存器直接操作，不依赖 HAL_IWDG 源文件） */
+#define IWDG_REFRESH()    do { IWDG->KR = 0xAAAAU; } while(0)
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -102,6 +105,11 @@ int main(void)
   MX_CAN_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
+  /* 独立看门狗初始化（~2秒超时，LSI 40kHz/64×1250≈2.0s，寄存器直接操作） */
+  IWDG->KR = 0x5555U;       /* 使能 PR/RLR 写入 */
+  IWDG->PR = 4U;             /* PR=4 → 预分频 64 */
+  IWDG->RLR = 1250U;         /* 重装载值 */
+  IWDG->KR = 0xCCCCU;       /* 启动 IWDG */
   /* USER CODE BEGIN 2 */
 
   /* ================================================================
@@ -216,6 +224,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+      IWDG_REFRESH();   /* 喂独立看门狗 */
       VOFA_SendDebug();
     /* USER CODE END WHILE */
 

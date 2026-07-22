@@ -21,7 +21,7 @@ static CAN_RxHeaderTypeDef  rx_header;
 static CAN_RxCallback_t     rx_callback = NULL;   /**< 注册的 RX 回调 */
 
 /**
- * @brief  初始化 CAN（配置滤波器 + 启动）
+ * @brief  初始化 CAN（配置滤波器 + 启动 + 使能错误中断）
  */
 void CAN_Init(void)
 {
@@ -39,6 +39,11 @@ void CAN_Init(void)
     HAL_CAN_ConfigFilter(&hcan, &filter);
     HAL_CAN_ActivateNotification(&hcan, CAN_IT_RX_FIFO0_MSG_PENDING);
     HAL_CAN_Start(&hcan);
+
+    /* 使能错误 / Bus-Off 中断 —— 用于 Bus-Off 自动恢复 */
+    HAL_NVIC_SetPriority(CAN1_SCE_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(CAN1_SCE_IRQn);
+    HAL_CAN_ActivateNotification(&hcan, CAN_IT_ERROR | CAN_IT_BUSOFF);
 }
 
 /**
@@ -85,5 +90,52 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_ptr)
     if (rx_callback != NULL)
     {
         rx_callback(rx_header.StdId, data);
+    }
+}
+
+/* ================================================================
+ *  HAL CAN 错误回调 —— Bus-Off 自动恢复
+ *
+ *  被 CAN1_SCE_IRQHandler → HAL_CAN_IRQHandler 调用。
+ *
+ *  Bus-Off 恢复流程：
+ *    1. 停止 CAN（清除错误状态）
+ *    2. 重新配置滤波器
+ *    3. 重新启动 CAN
+ *    4. 重新使能通知
+ *
+ *  注意：恢复在中断上下文中执行，耗时约几十微秒，不影响 1kHz FOC 周期。
+ * ================================================================ */
+void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan_ptr)
+{
+    if (hcan_ptr->Instance != CAN1)
+        return;
+
+    if (hcan_ptr->ErrorCode & HAL_CAN_ERROR_BOF)
+    {
+        /* ---- Bus-Off：停止 CAN 硬件 ---- */
+        HAL_CAN_Stop(hcan_ptr);
+        hcan_ptr->ErrorCode = HAL_CAN_ERROR_NONE;
+
+        /* ---- 重新配置滤波器 ---- */
+        CAN_FilterTypeDef filter;
+        filter.FilterBank           = 1;
+        filter.FilterMode           = CAN_FILTERMODE_IDMASK;
+        filter.FilterScale          = CAN_FILTERSCALE_16BIT;
+        filter.FilterIdHigh         = 0x0000;
+        filter.FilterIdLow          = 0x0000;
+        filter.FilterMaskIdHigh     = 0x00;
+        filter.FilterMaskIdLow      = 0x00;
+        filter.FilterFIFOAssignment = CAN_FILTER_FIFO0;
+        filter.FilterActivation     = ENABLE;
+        HAL_CAN_ConfigFilter(hcan_ptr, &filter);
+
+        /* ---- 重新启动 CAN ---- */
+        HAL_CAN_Start(hcan_ptr);
+
+        /* ---- 重新使能通知 ---- */
+        HAL_CAN_ActivateNotification(hcan_ptr, CAN_IT_RX_FIFO0_MSG_PENDING
+                                                  | CAN_IT_ERROR
+                                                  | CAN_IT_BUSOFF);
     }
 }
