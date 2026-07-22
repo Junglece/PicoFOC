@@ -6,8 +6,7 @@
  * Copyright (c) 2024 The FOC Firmware Contributors
  *
  * 特性：
- *   - 积分项做时间归一化（integral += error × dt），频率改变时 ki 行为不变
- *   - 微分项采用 Derivative-on-Measurement，抑制设定值突变导致的微分冲击
+ *   - Derivative-on-Measurement：微分项输入测量值变化量，抑制设定值突变导致的微分冲击
  */
 
 #ifndef __PID_H__
@@ -25,7 +24,7 @@ typedef struct
 
     float error;            /**< 当前误差 */
     float integral;         /**< 积分累加值 */
-    float measure_error;    /**< 测量值微分（Derivative-on-Measurement） */
+    float measure_error;    /**< 测量值变化量（相邻两次测量值的差值，即 Delta） */
     float differential;     /**< 微分项 */
     float output;           /**< PID 输出 */
 } PID_t;

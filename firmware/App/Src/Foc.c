@@ -68,7 +68,7 @@ void FOC_Init(FOC_t *foc,
 
     /* 初始化独立速度环 PI（默认参数，速度模式可通过 CAN 覆盖） */
     PID_Init(&foc->SpdPID_Ext, 0.05f, 0.01f, 0.0f, cfg->rate_hz,
-             cfg->bus_voltage, cfg->bus_voltage);
+             1000.0f, cfg->bus_voltage);
 }
 
 /* ================================================================
@@ -83,12 +83,12 @@ void FOC_SetPosPID(FOC_t *foc, float kp, float ki, float kd, float out_max)
 
 void FOC_SetSpdPID(FOC_t *foc, float kp, float ki, float kd, float out_max)
 {
-    PID_Init(&foc->SpdPID, kp, ki, kd, foc->rate, foc->Umax, out_max);
+    PID_Init(&foc->SpdPID, kp, ki, kd, foc->rate, 1000.0f, out_max);
 }
 
 void FOC_SetSpdExtPID(FOC_t *foc, float kp, float ki, float kd, float out_max)
 {
-    PID_Init(&foc->SpdPID_Ext, kp, ki, kd, foc->rate, foc->Umax, out_max);
+    PID_Init(&foc->SpdPID_Ext, kp, ki, kd, foc->rate, 1000.0f, out_max);
 }
 
 /* ================================================================

@@ -6,8 +6,7 @@
  * Copyright (c) 2024 The FOC Firmware Contributors
  *
  * 改动说明（相比原版）：
- *   1. integral += error × dt（时间归一化，频率改变时 ki 不变）
- *   2. 微分项采用 Derivative-on-Measurement
+ *   1. 微分项采用 Derivative-on-Measurement
  */
 
 #include "pid.h"
@@ -33,8 +32,8 @@ float PID_Calc(PID_t *pid, float error, float measure_error)
     pid->error         = error;
     pid->measure_error = measure_error;
 
-    /* ---- 积分项（时间归一化） ---- */
-    pid->integral += error * pid->dt;
+    /* ---- 积分项 ---- */
+    pid->integral += error;
 
     /* 积分限幅 */
     if (pid->integral > pid->integral_max)
@@ -48,7 +47,7 @@ float PID_Calc(PID_t *pid, float error, float measure_error)
     /* ---- PID 输出 ---- */
     pid->output = pid->kp * error
                 + pid->ki * pid->integral
-                + pid->kd * pid->differential / pid->dt;
+                + pid->kd * pid->differential;
 
     /* 输出限幅 */
     if (pid->output > pid->output_max)
