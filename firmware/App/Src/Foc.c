@@ -73,6 +73,8 @@ void FOC_Init(FOC_t *foc,
 
 /* ================================================================
  *  FOC_SetPosPID / FOC_SetSpdPID / FOC_SetSpdExtPID —— 设置 PID 参数
+ *
+ * 注意：PID 已做时间归一化（integral += error × dt），频率改变时 ki 行为不变。
  * ================================================================ */
 void FOC_SetPosPID(FOC_t *foc, float kp, float ki, float kd, float out_max)
 {

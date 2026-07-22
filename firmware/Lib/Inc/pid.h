@@ -6,6 +6,7 @@
  * Copyright (c) 2024 The FOC Firmware Contributors
  *
  * 特性：
+ *   - 积分项做时间归一化（integral += error × dt），频率改变时 ki 行为不变
  *   - Derivative-on-Measurement：微分项输入测量值变化量，抑制设定值突变导致的微分冲击
  */
 
