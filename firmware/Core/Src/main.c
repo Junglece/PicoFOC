@@ -197,7 +197,7 @@ int main(void)
   CAN_Init();
   HAL_Delay(100);
   MotorMsg_Init();    /* 先初始化消息总线 */
-  CANProto_Init(1);    /* 再注册 CAN 回调，电机ID=1 → RX=0x001 TX=0x101 */
+  CANProto_Init(2);    /* 再注册 CAN 回调，电机ID=1 → RX=0x001 TX=0x101 */
   UARTProto_Init();   /* 再使能 UART 接收 */
   TIM_Init();
 
