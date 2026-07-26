@@ -29,6 +29,8 @@
 /** 喂独立看门狗（寄存器直接操作，不依赖 HAL 源文件） */
 #define IWDG_REFRESH()    do { IWDG->KR = 0xAAAAU; } while(0)
 
+/* SPEED_LIMIT_RPM 定义于 motor_config.h —— 所有模块共享 */
+
 void Motor_Loop(void)
 {
     static MotorMode_t   g_mode     = MOTOR_MODE_STANDBY;    /**< 当前运行模式 */
@@ -85,6 +87,8 @@ void Motor_Loop(void)
 
             case MOTOR_MODE_SPEED:
                 Motor.target_speed = cmd.target * RAD_S_TO_RPM;
+                Motor.target_speed = DATA_limit(Motor.target_speed,
+                                                  -SPEED_LIMIT_RPM, SPEED_LIMIT_RPM);
                 FOC_SetSpdExtPID(&Motor, cmd.spd_kp, cmd.spd_ki, 0.0f, Motor.Umax);
                 break;
 
@@ -131,6 +135,7 @@ void Motor_Loop(void)
      *  第 2 步：FOC 流水线（按模式执行不同控制环）
      * ================================================================ */
     FOC_UpdateSensor(&Motor);
+    FOC_ReadCurrents(&Motor);       /* 读三相电流 → Clarke → Park → Id/Iq */
 
     switch (g_mode)
     {

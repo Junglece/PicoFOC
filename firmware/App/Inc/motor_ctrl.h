@@ -10,7 +10,7 @@
  *
  * 四种控制模式：
  *   STANDBY    (0) : 关断驱动芯片（PB1 拉低，PWM 停止，PID 积分清零）
- *   TORQUE     (1) : 电流环（预留）
+ *   TORQUE     (1) : 转矩控制（预留）
  *   SPEED      (2) : 独立速度 PI 环  →  使用 SpdPID_Ext
  *   POSITION   (3) : 串级位置 PD + 速度 PI 环  →  使用 PosPID + SpdPID
  *   CALIBRATE  (4) : 电角度自校准 → 注入 Ud=4V 拉转子对齐，结果写入 Flash

@@ -166,9 +166,14 @@ void FOC_PosCtrl(FOC_t *foc)
  *  误差 = 目标速度 - 当前速度
  *  输出 = Uq（交轴电压）
  *  使用 SpdPID（与位置环联调），用于位置模式的串级内环。
+ *
+ *  速度限幅：target_speed 被钳制在 ±SPEED_LIMIT_RPM 内，
+ *  定义于 motor_config.h，所有控制路径（SPEED/POSITION 指令、位置环输出）统一。
  * ================================================================ */
 void FOC_SpdCtrl(FOC_t *foc)
 {
+    foc->target_speed = DATA_limit(foc->target_speed,
+                                    -SPEED_LIMIT_RPM, SPEED_LIMIT_RPM);
     float error = foc->target_speed - foc->speed;
     foc->Uq = PID_Calc(&foc->SpdPID, error, foc->speed - foc->last_speed);
 }
@@ -181,6 +186,8 @@ void FOC_SpdCtrl(FOC_t *foc)
  * ================================================================ */
 void FOC_SpdCtrl_Ext(FOC_t *foc)
 {
+    foc->target_speed = DATA_limit(foc->target_speed,
+                                    -SPEED_LIMIT_RPM, SPEED_LIMIT_RPM);
     float error = foc->target_speed - foc->speed;
     foc->Uq = PID_Calc(&foc->SpdPID_Ext, error, foc->speed - foc->last_speed);
 }
@@ -248,16 +255,63 @@ void FOC_Output(FOC_t *foc)
         }
     }
 
-    /* ---- 反 Park 变换：d-q → α-β ---- */
+    /* ---- 电角度前馈补偿 ----
+     *
+     * 问题: 从 AS5600 角度采样到 PWM 生效之间存在 ~210μs 延迟。
+     *       高速时转子在此期间转过了可观的电角度, 导致反 Park 输出的
+     *       电压矢量滞后于实际转子位置, 部分电压跑到 d 轴。
+     *
+     * 补偿: 根据当前转速推算延迟期间的电角度增量, 前馈到输出角度。
+     *   angle_advance_deg = speed_rpm × pole_pairs × 6 × ANGLE_COMP_DELAY_S
+     *
+     * 此补偿只影响 FOC_Output 的反 Park 变换,
+     * foc->elec_angle 本身不变（保持为观测器估计值）。
+     *
+     * 原理: speed 是 rpm, 乘以 6 转为 deg/s (360/60=6)。
+     *       再乘极对数转为电角度 deg/s。
+     *       再乘延迟时间 s 得到应补偿的电角度。
+     *
+     * 补偿系数定义于 motor_config.h。
+     * ================================================================ */
+    float angle_advance = foc->speed * (float)foc->pole_pairs * 6.0f * ANGLE_COMP_DELAY_S;
+    float comp_elec_angle = foc->elec_angle + angle_advance;
+
+    /* ---- (Ud, Uq) 矢量限幅 —— 防止进入过调制区 ----
+     *
+     * 当 Ud/Uq 合成矢量模长超过线性调制区上限时，
+     * 等比例缩小（不改变方向），避免电压削波导致电机发热。
+     *
+     * 上限 = Umax × VOLTAGE_MODULATION_FACTOR
+     *   0.5      × Umax = SPWM   上限（Udc/2）
+     *   0.57735  × Umax = SVPWM  上限（Udc/√3）
+     *
+     * 限幅系数定义于 motor_config.h，换调制方式时更新它即可。
+     * ================================================================ */
+    {
+        float vmag = sqrtf(foc->Ud * foc->Ud + foc->Uq * foc->Uq);
+        float vlim = foc->Umax * VOLTAGE_MODULATION_FACTOR;
+        if (vmag > vlim)
+        {
+            float scale = vlim / vmag;
+            foc->Ud *= scale;
+            foc->Uq *= scale;
+        }
+    }
+
+    /* ---- 反 Park 变换：d-q → α-β（使用补偿后的电角度） ---- */
     float u_alpha, u_beta;
     FOC_Math_InvPark(foc->Ud, foc->Uq,
-                     foc->elec_angle * DEG_TO_RAD,
+                     comp_elec_angle * DEG_TO_RAD,
                      &u_alpha, &u_beta);
 
-    /* ---- 反 Clarke 变换：α-β → 三相电压（量纲为 V） ---- */
+    /* ---- 反 Clarke 变换：α-β → 三相电压（量纲为 V）
+     *
+     * 使用 SVPWM（零序分量注入法），直流利用率 ~100%。
+     * 如果需要切回 SPWM，把 FOC_Math_InvClarke_SVPWM 换回 FOC_Math_InvClarke。
+     * ================================================================ */
     float duty_a, duty_b, duty_c;
-    FOC_Math_InvClarke(u_alpha, u_beta, foc->Umax,
-                        &duty_a, &duty_b, &duty_c);
+    FOC_Math_InvClarke_SVPWM(u_alpha, u_beta, foc->Umax,
+                              &duty_a, &duty_b, &duty_c);
 
     /* ---- 限幅到 [0, Umax] 并归一化到 [0.0, 1.0] ---- */
     float inv_umax = 1.0f / foc->Umax;
@@ -280,4 +334,22 @@ void FOC_CalibStep(FOC_t *foc)
     foc->elec_angle = 0.0f;
     foc->Uq = 0.0f;
     foc->Ud = 4.0f;
+}
+
+/* ================================================================
+ *  FOC_ReadCurrents —— 读三相电流 → Clarke → Park → Id/Iq
+ *
+ *  当前无电流反馈，Id/Iq 恒为 0。保留此函数供后续硬件升级后恢复使用。
+ *
+ *  调用位置: Motor_Loop 中 FOC_UpdateSensor 之后
+ * ================================================================ */
+void FOC_ReadCurrents(FOC_t *foc)
+{
+    foc->Ia = 0.0f;
+    foc->Ib = 0.0f;
+    foc->Ic = 0.0f;
+    foc->I_alpha = 0.0f;
+    foc->I_beta = 0.0f;
+    foc->Id = 0.0f;
+    foc->Iq = 0.0f;
 }

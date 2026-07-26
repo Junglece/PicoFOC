@@ -21,7 +21,6 @@
 #include "Foc.h"
 #include "drv_tim.h"
 #include "drv_can.h"
-#include "drv_adc.h"
 #include "can_proto.h"
 #include "motor_msg.h"
 #include "uart_proto.h"
@@ -105,11 +104,6 @@ int main(void)
   MX_CAN_Init();
   MX_USART1_UART_Init();
   MX_ADC1_Init();
-  /* 独立看门狗初始化（~2秒超时，LSI 40kHz/64×1250≈2.0s，寄存器直接操作） */
-  IWDG->KR = 0x5555U;       /* 使能 PR/RLR 写入 */
-  IWDG->PR = 4U;             /* PR=4 → 预分频 64 */
-  IWDG->RLR = 1250U;         /* 重装载值 */
-  IWDG->KR = 0xCCCCU;       /* 启动 IWDG */
   /* USER CODE BEGIN 2 */
 
   /* ================================================================
@@ -182,7 +176,7 @@ int main(void)
    * ================================================================ */
   FOC_SetSpdPID(&Motor, 0.01f,  0.004f, 0.0f, 6.0f);     /* 串级速度环（位置环内环） */
   FOC_SetPosPID(&Motor, 5.0f,   0.0f,   0.0f, 2000.0f);   /* 位置环 PD */
-  FOC_SetSpdExtPID(&Motor, 0.05f, 0.01f, 0.0f, 6.0f);    /* 独立速度环 PI（速度模式专用） */
+  FOC_SetSpdExtPID(&Motor, 0.05f, 0.01f, 0.0f, 12.0f);    /* 独立速度环 PI（速度模式专用） */
 
   /* ================================================================
    *  第 5 步：初始化驱动层 + 协议层
@@ -197,7 +191,7 @@ int main(void)
   CAN_Init();
   HAL_Delay(100);
   MotorMsg_Init();    /* 先初始化消息总线 */
-  CANProto_Init(2);    /* 再注册 CAN 回调，电机ID=1 → RX=0x001 TX=0x101 */
+  CANProto_Init(1);    /* 再注册 CAN 回调，电机ID=1 → RX=0x001 TX=0x101 */
   UARTProto_Init();   /* 再使能 UART 接收 */
   TIM_Init();
 
@@ -206,17 +200,11 @@ int main(void)
   LED_SetBrightness(100);
 
   /* ================================================================
-   *  第 6 步：注册控制回调 → 串起整个控制链
+   *  第 6 步：注册控制回调
    *
-   *  TIM1 中断 → Motor_Loop() → FOC 流水线
-   *
-   *  如果想用 ADC 电流采样（预留）：
-   *    ADC_DMA_Mode_Init();
+   *  Motor_Loop()  : TIM1 中断 → 1kHz FOC 流水线
    * ================================================================ */
   TIM_RegisterCallback(Motor_Loop);
-
-  /* 电流采样 DMA（ADC 预留，暂未使用） */
-  ADC_DMA_Mode_Init();
 
   /* USER CODE END 2 */
 
@@ -287,21 +275,30 @@ void SystemClock_Config(void)
  * 帧格式（just-float 引擎）：
  *   8 × float (32 bytes) + 4-byte tail {0x00,0x00,0x80,0x7f}
  *
+ * 触发条件：仅 CAN 模式下发送（由 MotorMsg_IsCANMode 判定）
+ *   CAN 模式：VOFA+ 全速发送（UART 自定义协议停发，带宽空出）
+ *   UART 模式：VOFA+ 停发（UART 自定义协议 1kHz 跑满）
+ *
  * 通道映射：
- *   ch0 = 机械角度 (deg)    ch1 = 目标角度 (deg)
- *   ch2 = 运行模式           ch3 = 目标值 (rad/rpm/Nm)
- *   ch4 = 实际转速 (rpm)     ch5 = Uq 输出电压 (V)
+ *   ch0 = Id (A)              ch1 = Iq (A)
+ *   ch2 = 机械角度 (deg)       ch3 = 转速 (rpm)
+ *   ch4 = Uq 电压 (V)          ch5 = Ia (A)
+ *   ch6 = Ib (A)               ch7 = Ic (A)
  */
 static void VOFA_SendDebug(void)
 {
-    vofa_message[0] = Motor.mech_angle;              /* ch0：机械角度 (deg)          */
-    vofa_message[1] = Motor.target_angle;            /* ch1：目标角度 (deg)          */
-    vofa_message[2] = (float)MotorMsg_GetLastMode(); /* ch2：运行模式                */
-    vofa_message[3] = MotorMsg_GetLastTarget();      /* ch3：目标值 (rad/rpm/Nm)     */
-    vofa_message[4] = Motor.speed;                   /* ch4：实际转速 (rpm)          */
-    vofa_message[5] = Motor.Uq;                      /* ch5：Uq 输出电压 (V)         */
-    vofa_message[6] = 0;
-    vofa_message[7] = 0;
+    /* 仅 CAN 模式下发送 VOFA+（UART 模式下让带宽给自定义协议 1kHz） */
+    if (!MotorMsg_IsCANMode())
+        return;
+
+    vofa_message[0] = Motor.Id;                   /* ch0：D 轴电流 (A)          */
+    vofa_message[1] = Motor.Iq;                   /* ch1：Q 轴电流 (A)          */
+    vofa_message[2] = Motor.mech_angle;           /* ch2：机械角度 (deg)        */
+    vofa_message[3] = Motor.speed;                /* ch3：转速 (rpm)            */
+    vofa_message[4] = Motor.Uq;                   /* ch4：Uq 输出电压 (V)       */
+    vofa_message[5] = Motor.Ia;                   /* ch5：A 相电流 (A)          */
+    vofa_message[6] = Motor.Ib;                   /* ch6：B 相电流 (A)          */
+    vofa_message[7] = Motor.Ic;                   /* ch7：C 相电流 (A)          */
 
     UARTProto_SendVOFA(vofa_message, 8);
 }

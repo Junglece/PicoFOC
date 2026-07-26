@@ -285,7 +285,7 @@ void UARTProto_SendPayload(uint8_t data[8])
     HAL_UART_Transmit_IT(&huart1, uart_tx_custom_frame, UART_FRAME_LEN);
 }
 
-/* ================================================================
+/******************************************************************************
  *  发送 VOFA+ just-float 调试帧
  *
  *  谁调我：main.c 的 VOFA_SendDebug()（在 while(1) 循环里调）
@@ -295,23 +295,13 @@ void UARTProto_SendPayload(uint8_t data[8])
  *    STM32 发 8 个 float（32 字节）→ VOFA+ 在上位机画 8 条波形
  *    帧尾 0x00,0x00,0x80,0x7f 是 VOFA+ 的 just-float 引擎标记
  *
- *  速率限制：100Hz（每 10ms 最多一帧）
- *  ——因为 UART 只有一根线，1kHz 的自定义协议是优先的
- *  ——VOFA 只是调试用，100Hz 画波形肉眼已经看不出延迟了
- *  ——如果 uart_tx_busy=1（自定义协议正在发），VOFA 帧也会被丢弃
- *
- *  注意：VOFA+ 上位机和自定义上位机共用 UART 线互不干扰
- *    VOFA+ 上位机只认这个帧尾，看到 0xAA 开头的帧当无效浮点数忽略
- *    自定义上位机只认 0xAA，看到 VOFA 帧 CRC 过不了就丢弃
- * ================================================================ */
+ *  触发时机：仅 CAN 模式下通过 main.c 的条件判断才调到这里
+ *    UART 模式下此函数不被调用（main.c 中短路返回）
+ *    这里不做限速，让 while(1) 全速发出
+ *    与 UARTProto_SendPayload 共用 uart_tx_busy 锁互斥
+ ******************************************************************************/
 void UARTProto_SendVOFA(const float *data, uint8_t count)
 {
-    static uint32_t last_vofa = 0;
-
-    if (HAL_GetTick() - last_vofa < 10)
-        return;
-
-    /* 与 SendPayload 共享同一把锁，防止两路发送覆盖 HAL 内部状态 */
     __disable_irq();
     if (uart_tx_busy) { __enable_irq(); return; }
     uart_tx_busy = 1;
@@ -326,6 +316,5 @@ void UARTProto_SendVOFA(const float *data, uint8_t count)
     const uint8_t tail[4] = {0x00, 0x00, 0x80, 0x7f};
     memcpy(uart_tx_vofa_buf + data_bytes, tail, 4);
 
-    last_vofa = HAL_GetTick();
     HAL_UART_Transmit_IT(&huart1, uart_tx_vofa_buf, data_bytes + 4);
 }

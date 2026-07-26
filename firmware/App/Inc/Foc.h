@@ -76,6 +76,18 @@ typedef struct
     float    target_angle;          /**< 目标机械角度 (0 ~ 360°) */
     float    target_speed;          /**< 目标速度 (rpm) */
 
+    /* ==== 三相电流 + 坐标变换输出 ==== */
+    float    Ia;                    /**< Phase A 电流 (A) */
+    float    Ib;                    /**< Phase B 电流 (A) */
+    float    Ic;                    /**< Phase C 电流 (A) */
+    float    I_alpha;               /**< α 轴电流 (A) — Clarke 输出 */
+    float    I_beta;                /**< β 轴电流 (A) — Clarke 输出 */
+    float    Id;                    /**< D 轴电流 (A) — Park 输出 */
+    float    Iq;                    /**< Q 轴电流 (A) — Park 输出 */
+
+    /* ==== 三相电流缓冲区（当前恒为 0）==== */
+    float    current_raw[3];        /**< 三相电流 (A)，当前未使用恒为 0 */
+
     /* ==== 电角度校准 ==== */
     uint16_t calib_flag;            /**< 校准标志：1 = 正在校准 */
     uint32_t calib_count;           /**< 校准计数 */
@@ -106,11 +118,12 @@ void FOC_SetSpdExtPID(FOC_t *foc, float kp, float ki, float kd, float out_max);
 /** @brief 设置目标角度（自动限幅到 0~360°） */
 void FOC_SetTarget(FOC_t *foc, float target_angle);
 
-void FOC_UpdateSensor(FOC_t *foc);  /**< 读传感器 + 算电角度 + 算转速   */
-void FOC_PosCtrl(FOC_t *foc);       /**< 位置环（PD）                    */
-void FOC_SpdCtrl(FOC_t *foc);       /**< 串级速度环（PI）                 */
-void FOC_SpdCtrl_Ext(FOC_t *foc);   /**< 独立速度环（PI，使用 SpdPID_Ext） */
-void FOC_Output(FOC_t *foc);        /**< 反 Park + SVPWM + 输出到 PWM    */
+void FOC_UpdateSensor(FOC_t *foc);  /**< 读传感器 + 算电角度 + 算转速       */
+void FOC_ReadCurrents(FOC_t *foc);  /**< 读三相电流 → Clarke → Park → Id/Iq */
+void FOC_PosCtrl(FOC_t *foc);       /**< 位置环（PD）                        */
+void FOC_SpdCtrl(FOC_t *foc);       /**< 串级速度环（PI）                     */
+void FOC_SpdCtrl_Ext(FOC_t *foc);   /**< 独立速度环（PI，使用 SpdPID_Ext）   */
+void FOC_Output(FOC_t *foc);        /**< 反 Park + SVPWM + 输出到 PWM        */
 
 /** @brief 使能电机输出（PB1 拉高 + PWM 启动） */
 void FOC_Enable(FOC_t *foc);

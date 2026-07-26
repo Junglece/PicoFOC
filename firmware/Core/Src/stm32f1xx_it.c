@@ -22,6 +22,7 @@
 #include "stm32f1xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "Foc.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,6 +58,7 @@
 /* External variables --------------------------------------------------------*/
 extern CAN_HandleTypeDef hcan;
 extern TIM_HandleTypeDef htim1;
+extern TIM_HandleTypeDef htim3;
 extern UART_HandleTypeDef huart1;
 /* USER CODE BEGIN EV */
 
@@ -290,6 +292,22 @@ void TIM1_CC_IRQHandler(void)
 }
 
 /**
+  * @brief TIM3 capture/compare interrupt handler (safety stub)
+  */
+void TIM3_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM3_IRQn 0 */
+  if (TIM3->SR & TIM_SR_CC4IF)
+  {
+    TIM3->SR = (uint16_t)~TIM_SR_CC4IF;
+  }
+  /* USER CODE END TIM3_IRQn 0 */
+  /* USER CODE BEGIN TIM3_IRQn 1 */
+
+  /* USER CODE END TIM3_IRQn 1 */
+}
+
+/**
   * @brief This function handles USART1 global interrupt.
   */
 void USART1_IRQHandler(void)
@@ -301,14 +319,6 @@ void USART1_IRQHandler(void)
   /* USER CODE BEGIN USART1_IRQn 1 */
 
   /* USER CODE END USART1_IRQn 1 */
-}
-
-/**
-  * @brief CAN1 SCE（状态变更与错误）中断处理
-  */
-void CAN1_SCE_IRQHandler(void)
-{
-  HAL_CAN_IRQHandler(&hcan);
 }
 
 /* USER CODE BEGIN 1 */

@@ -35,8 +35,10 @@
  * ================================================================ */
 
 /* 状态帧编码系数（float → int16 LE） */
-#define POS_ENC_SCALE    (834.4f)    /* 32767 / (12.5 × π) ≈ 834.4  */
-#define SPD_ENC_SCALE    (655.34f)   /* 32767 / 50 ≈ 655.34         */
+#define POS_ENC_SCALE    (834.4f)    /* 32767 / (12.5 × π) ≈ 834.4   */
+#define SPD_ENC_SCALE    (131.07f)   /* 32767 / 250 ≈ 131.07         */
+                                     /* rad/s 范围 ±250  →  覆盖 ±2387 rpm   */
+                                     /* 分辨率 0.0076 rad/s ≈ 0.073 rpm       */
 #define VQ_ENC_SCALE     (819.175f)  /* 32767 / 40 ≈ 819.175        */
 
 /* 控制帧解码系数（原始整型 → float） */
@@ -55,6 +57,9 @@ static volatile uint8_t g_new_frame = 0;
 static float g_pos_rad  = 0.0f;     /**< 机械位置 (rad) */
 static float g_spd_rads = 0.0f;     /**< 机械速度 (rad/s) */
 static float g_vq       = 0.0f;     /**< 交轴电压 (V) */
+
+/** 最近一次收到 CAN 帧的时刻 (ms)，用于判断 CAN/UART 模式切换 */
+static uint32_t g_last_can_rx = 0;
 
 /* ================================================================
  *  中央解码 —— CAN 和 UART 共用（两者 payload 格式一致）
@@ -118,7 +123,9 @@ void MotorMsg_Init(void)
  * ================================================================ */
 void MotorMsg_OnFrameReceived(MotorMsg_Channel_t ch, uint8_t *payload)
 {
-    (void)ch;
+    if (ch == MSG_CH_CAN)
+        g_last_can_rx = HAL_GetTick();
+
     DecodeCommand(payload, &g_cmd);
     g_new_frame = 1;
 }
@@ -167,19 +174,23 @@ void MotorMsg_UpdateStatus(float position_rad, float speed_rads, float vq)
  *  流程：
  *    1. 3 个 float（位置/速度/Vq）→ 编码成 int16（省带宽）
  *    2. 填入 8 字节 payload（跟 CAN 状态帧布局完全一样）
- *    3. 分发给各通道：CAN 1kHz，UART 100Hz
+ *    3. 分发给各通道：CAN 1kHz + UART 条件分发
  *
- *  【频率策略说明】
- *  115200 8N1 下 UART 最大吞吐 = 11,520 字节/秒
- *  如果 UART 也 1kHz：12 帧×12B + VOFA 100Hz×36B = 18,000 > 11,520 ❌
- *  所以 UART 自定义协议降到 100Hz：
- *    自定义帧 12B×100Hz = 1,200 B/s
- *    VOFA+ 帧 36B×100Hz = 3,600 B/s
- *    合计 4,800 B/s < 11,520 ✓  VOFA+ 能正常工作
+ *  【双模策略】
+ *    模式判定：500ms 内收到过 CAN 帧 = CAN 模式，否则 UART 模式
+ *
+ *    CAN 模式（VOFA+ 调试 / 开发者模式）：
+ *      CAN Proto → 1kHz（始终发送）
+ *      UART Proto → 停发（省出带宽给 VOFA+ 全速调试）
+ *      VOFA+ → 全速 36B/帧（在 main.c while(1) 中发送）
+ *
+ *    UART 模式（日常控制 / 普通用户）：
+ *      CAN Proto → 1kHz（始终发送——CAN 总线不占 UART 带宽）
+ *      UART Proto → 1kHz（12B/帧 跑满 115200 绰绰有余）
+ *      VOFA+ → 停发
  * ================================================================ */
 void MotorMsg_TxStatus(void)
 {
-    static uint8_t uart_div = 0;
     uint8_t payload[8];
     int16_t raw;
 
@@ -200,10 +211,10 @@ void MotorMsg_TxStatus(void)
 
     CANProto_SendPayload(payload);   /* → CAN 总线，1kHz */
 
-    if (++uart_div >= 10)            /* UART 每 10 次发一帧 → 100Hz */
+    /* UART 自定义协议：仅 UART 模式下发送（1kHz） */
+    if (!MotorMsg_IsCANMode())
     {
-        uart_div = 0;
-        UARTProto_SendPayload(payload);  /* → UART 线（0xAA + CRC） */
+        UARTProto_SendPayload(payload);
     }
 }
 
@@ -226,4 +237,9 @@ float MotorMsg_GetLastTarget(void)
     t = g_cmd.target;
     __enable_irq();
     return t;
+}
+
+uint8_t MotorMsg_IsCANMode(void)
+{
+    return (HAL_GetTick() - g_last_can_rx) < CAN_TIMEOUT_MS;
 }

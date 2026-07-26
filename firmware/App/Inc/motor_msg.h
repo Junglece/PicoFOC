@@ -86,6 +86,9 @@
 
 #include <stdint.h>
 
+/** @brief CAN 通信超时阈值 (ms) — 超过此时间未收到 CAN 帧则切回 UART 模式 */
+#define CAN_TIMEOUT_MS  500
+
 /* ================================================================
  *  电机运行模式（与通信介质无关）
  * ================================================================ */
@@ -142,5 +145,8 @@ void MotorMsg_UpdateStatus(float position_rad, float speed_rads, float vq);
 void MotorMsg_TxStatus(void);
 MotorMode_t MotorMsg_GetLastMode(void);
 float       MotorMsg_GetLastTarget(void);
+
+/** @brief 检测当前是否为 CAN 调试模式（500ms 内收到过 CAN 消息） */
+uint8_t MotorMsg_IsCANMode(void);
 
 #endif /* __MOTOR_MSG_H__ */
