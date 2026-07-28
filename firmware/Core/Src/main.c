@@ -56,9 +56,6 @@
 
 /* USER CODE BEGIN PV */
 float vofa_message[8];
-
-/** IWDG 刷新宏 —— 喂独立看门狗（寄存器直接操作，不依赖 HAL_IWDG 源文件） */
-#define IWDG_REFRESH()    do { IWDG->KR = 0xAAAAU; } while(0)
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -206,6 +203,9 @@ int main(void)
    * ================================================================ */
   TIM_RegisterCallback(Motor_Loop);
 
+  /* ---- 启动独立看门狗（~2s 超时，主循环 + Motor_Loop 双重喂狗） ---- */
+  IWDG_Init();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -270,6 +270,38 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /**
+ * @brief  初始化独立看门狗（IWDG）
+ *
+ * 使用 LSI ~40kHz 时钟源，预分频 /256 → ~156.25 Hz。
+ * 重装载值 312 → 超时 ≈ 312 / 156.25 ≈ 2.0s。
+ *
+ * 配置采用寄存器直接操作，不依赖 HAL_IWDG 模块，
+ * 与 IWDG_REFRESH() 宏保持一致的风格。
+ *
+ * 调用时机：main() 中所有外设初始化完成后、主循环开始前。
+ */
+static void IWDG_Init(void)
+{
+    /* 等待 LSI 就绪（IWDG 要求 LSI 已启动） */
+    while (!(RCC->CSR & RCC_CSR_LSIRDY));
+
+    /* 解锁 PR / RLR 寄存器写保护 */
+    IWDG->KR = 0x5555U;
+
+    /* 预分频器 = /256: 40kHz / 256 = 156.25 Hz */
+    IWDG->PR = 0x06U;
+
+    /* 重装载 = 312: 312 / 156.25 ≈ 2.0s */
+    IWDG->RLR = 0x0138U;
+
+    /* 刷新计数器并启动 IWDG */
+    IWDG->KR = 0xAAAAU;
+
+    /* 软件启动（若硬件选项字节未使能 IWDG） */
+    IWDG->KR = 0xCCCCU;
+}
+
+/**
  * @brief  通过 UART1 发送调试数据到 VOFA+ 串口示波器
  *
  * 帧格式（just-float 引擎）：
@@ -280,10 +312,10 @@ void SystemClock_Config(void)
  *   UART 模式：VOFA+ 停发（UART 自定义协议 1kHz 跑满）
  *
  * 通道映射：
- *   ch0 = Id (A)              ch1 = Iq (A)
- *   ch2 = 机械角度 (deg)       ch3 = 转速 (rpm)
- *   ch4 = Uq 电压 (V)          ch5 = Ia (A)
- *   ch6 = Ib (A)               ch7 = Ic (A)
+ *   ch0 = 机械角度 (deg)        ch1 = 目标角度 (deg)
+ *   ch2 = 转速 (rpm)            ch3 = 目标转速 (rpm)
+ *   ch4 = Uq 电压 (V)           ch5 = 运行模式 (int)
+ *   ch6 = 最近指令目标值          ch7 = 保留
  */
 static void VOFA_SendDebug(void)
 {
@@ -291,14 +323,14 @@ static void VOFA_SendDebug(void)
     if (!MotorMsg_IsCANMode())
         return;
 
-    vofa_message[0] = Motor.Id;                   /* ch0：D 轴电流 (A)          */
-    vofa_message[1] = Motor.Iq;                   /* ch1：Q 轴电流 (A)          */
-    vofa_message[2] = Motor.mech_angle;           /* ch2：机械角度 (deg)        */
-    vofa_message[3] = Motor.speed;                /* ch3：转速 (rpm)            */
+    vofa_message[0] = Motor.mech_angle;           /* ch0：机械角度 (deg)        */
+    vofa_message[1] = Motor.target_angle;         /* ch1：目标角度 (deg)        */
+    vofa_message[2] = Motor.speed;                /* ch2：转速 (rpm)            */
+    vofa_message[3] = Motor.target_speed;         /* ch3：目标转速 (rpm)        */
     vofa_message[4] = Motor.Uq;                   /* ch4：Uq 输出电压 (V)       */
-    vofa_message[5] = Motor.Ia;                   /* ch5：A 相电流 (A)          */
-    vofa_message[6] = Motor.Ib;                   /* ch6：B 相电流 (A)          */
-    vofa_message[7] = Motor.Ic;                   /* ch7：C 相电流 (A)          */
+    vofa_message[5] = (float)MotorMsg_GetLastMode(); /* ch5：运行模式 (int)      */
+    vofa_message[6] = MotorMsg_GetLastTarget();   /* ch6：最近指令目标值         */
+    vofa_message[7] = 0.0f;                       /* ch7：保留                  */
 
     UARTProto_SendVOFA(vofa_message, 8);
 }
@@ -312,9 +344,16 @@ static void VOFA_SendDebug(void)
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
+  /* 关断驱动芯片 + 禁用全部中断 */
+  GPIOB->BRR = GPIO_PIN_1;
   __disable_irq();
+
+  /* LED 快闪指示错误状态（~200ms 间隔，手动翻转 PA5） */
   while (1)
   {
+      /* 简单位翻转 —— 不依赖任何 ISR 或 HAL */
+      GPIOA->ODR ^= GPIO_PIN_5;
+      for (volatile uint32_t i = 0; i < 1000000U; i++) { }
   }
   /* USER CODE END Error_Handler_Debug */
 }

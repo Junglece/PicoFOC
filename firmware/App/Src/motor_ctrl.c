@@ -26,9 +26,6 @@
 #include "led_indicator.h"
 #include "main.h"
 
-/** 喂独立看门狗（寄存器直接操作，不依赖 HAL 源文件） */
-#define IWDG_REFRESH()    do { IWDG->KR = 0xAAAAU; } while(0)
-
 /* SPEED_LIMIT_RPM 定义于 motor_config.h —— 所有模块共享 */
 
 void Motor_Loop(void)

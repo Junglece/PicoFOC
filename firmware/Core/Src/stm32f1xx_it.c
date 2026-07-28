@@ -73,7 +73,8 @@ extern UART_HandleTypeDef huart1;
 void NMI_Handler(void)
 {
   /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
-
+  /* 拉低 PB1 —— 关断驱动芯片 MP6541，防止电机继续运行 */
+  GPIOB->BRR = GPIO_PIN_1;
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
    while (1)
@@ -293,6 +294,11 @@ void TIM1_CC_IRQHandler(void)
 
 /**
   * @brief TIM3 capture/compare interrupt handler (safety stub)
+  *
+  * CC4 中断原用于电流采样的 PWM 同步触发（已封存，见 Docs/）。
+  * 当前仅清除 CC4 中断标志防止重复进入，不做其他操作。
+  * 保留此 ISR 是因为 CubeMX 已使能 TIM3 全局中断，
+  * 若删除会导致中断向量表悬空。
   */
 void TIM3_IRQHandler(void)
 {
