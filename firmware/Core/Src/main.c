@@ -282,7 +282,8 @@ void SystemClock_Config(void)
  */
 static void IWDG_Init(void)
 {
-    /* 等待 LSI 就绪（IWDG 要求 LSI 已启动） */
+    /* 开启 LSI 时钟（复位后默认关闭，需先启动再等就绪） */
+    RCC->CSR |= RCC_CSR_LSION;
     while (!(RCC->CSR & RCC_CSR_LSIRDY));
 
     /* 解锁 PR / RLR 寄存器写保护 */
@@ -294,10 +295,10 @@ static void IWDG_Init(void)
     /* 重装载 = 312: 312 / 156.25 ≈ 2.0s */
     IWDG->RLR = 0x0138U;
 
-    /* 刷新计数器并启动 IWDG */
+    /* 刷新计数器 */
     IWDG->KR = 0xAAAAU;
 
-    /* 软件启动（若硬件选项字节未使能 IWDG） */
+    /* 软件启动 IWDG（LSI 已就绪，启动后立即开始递减计数） */
     IWDG->KR = 0xCCCCU;
 }
 
@@ -348,7 +349,7 @@ void Error_Handler(void)
   GPIOB->BRR = GPIO_PIN_1;
   __disable_irq();
 
-  /* LED 快闪指示错误状态（~200ms 间隔，手动翻转 PA5） */
+  /* LED 快闪指示错误状态（~110ms 间隔，手动翻转 PA5，约 2s 后 IWDG 复位） */
   while (1)
   {
       /* 简单位翻转 —— 不依赖任何 ISR 或 HAL */
