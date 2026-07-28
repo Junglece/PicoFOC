@@ -60,6 +60,9 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN Private defines */
 
+/** IWDG 刷新宏 —— 喂独立看门狗（寄存器直接操作，不依赖 HAL_IWDG 源文件） */
+#define IWDG_REFRESH()    do { IWDG->KR = 0xAAAAU; } while(0)
+
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
