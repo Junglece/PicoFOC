@@ -61,6 +61,7 @@ float vofa_message[8];
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+static void IWDG_Init(void);
 static void VOFA_SendDebug(void);
 /* USER CODE END PFP */
 
@@ -171,7 +172,7 @@ int main(void)
    *    pid_controller_create(&FOC_1.FOC_P_PID, 5, 0, 0, 1000, 2000, 2000);
    *    → FOC_SetPosPID(&Motor, 5, 0, 0, 2000);
    * ================================================================ */
-  FOC_SetSpdPID(&Motor, 0.01f,  0.004f, 0.0f, 6.0f);     /* 串级速度环（位置环内环） */
+  FOC_SetSpdPID(&Motor, 0.1f,   0.004f, 0.0f, 6.0f);     /* 串级速度环（位置环内环） — Kp 从 0.01→0.1，解决稳态附近 P 项太弱靠积分慢爬 */
   FOC_SetPosPID(&Motor, 5.0f,   0.0f,   0.0f, 2000.0f);   /* 位置环 PD */
   FOC_SetSpdExtPID(&Motor, 0.05f, 0.01f, 0.0f, 12.0f);    /* 独立速度环 PI（速度模式专用） */
 
