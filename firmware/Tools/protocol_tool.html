@@ -167,7 +167,7 @@ hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
 
 <div class="form-row">
     <div>
-        <label>Kd / Ki 微分/积分（0~1）</label>
+        <label id="kdLabel">Kd 微分增益（0~1）</label>
         <div class="slider-row">
             <input type="range" id="kdSlider" min="0" max="1" step="0.001" value="0">
             <span class="val" id="kdVal">0.000</span>
@@ -312,6 +312,7 @@ function toHex(v, pad) { return '0x' + v.toString(16).padStart(pad, '0').toUpper
 
 const KP_DEC = 0.00015259;
 const KD_DEC = 0.00392157;
+const KI_GAIN = 10.0;          /* spd_ki = raw * KD_DEC * KI_GAIN, pos_kd = raw * KD_DEC */
 const POS_ENC = 834.4;
 const SPD_ENC = 131.07;
 const VQ_ENC  = 819.175;
@@ -333,6 +334,7 @@ const kpRawEl = document.getElementById('kpRaw');
 const kdSlider = document.getElementById('kdSlider');
 const kdValEl = document.getElementById('kdVal');
 const kdRawEl = document.getElementById('kdRaw');
+const kdLabelEl = document.getElementById('kdLabel');
 const motorIdEl = document.getElementById('motorId');
 const canOutputEl = document.getElementById('canOutput');
 const uartOutputEl = document.getElementById('uartOutput');
@@ -357,7 +359,9 @@ function updateTargetUnit() {
     if (mode === 2) { // SPEED
         targetLabelEl.textContent = '目标速度';
         unitBtns[0].textContent = 'rpm';
+        unitBtns[0].dataset.unit = 'rpm';
         unitBtns[1].textContent = 'rad/s';
+        unitBtns[1].dataset.unit = 'rads';
         if (targetUnit === 'deg' || targetUnit === 'rad') {
             targetUnit = 'rpm';
             unitBtns.forEach(b => b.classList.remove('active'));
@@ -366,13 +370,16 @@ function updateTargetUnit() {
     } else { // POSITION, CALIBRATE etc.
         targetLabelEl.textContent = '目标角度';
         unitBtns[0].textContent = '°';
+        unitBtns[0].dataset.unit = 'deg';
         unitBtns[1].textContent = 'rad';
+        unitBtns[1].dataset.unit = 'rad';
         if (targetUnit === 'rpm' || targetUnit === 'rads') {
             targetUnit = 'deg';
             unitBtns.forEach(b => b.classList.remove('active'));
             document.querySelector('#targetUnit button[data-unit="deg"]')?.classList.add('active');
         }
     }
+    updateKDUI();  /* Ki/Kd range changes with mode */
     updateTargetHint();
 }
 
@@ -413,6 +420,25 @@ modeEl.addEventListener('change', () => {
     encode();
 });
 
+function updateKDUI() {
+    const mode = parseInt(modeEl.value);
+    if (mode === 2) {
+        /* SPEED: Ki 0~10 */
+        kdLabelEl.textContent = 'Ki 积分增益（0~10）';
+        kdSlider.max = '10';
+        kdSlider.step = '0.01';
+        const v = parseFloat(kdSlider.value);
+        if (v > 10) { kdSlider.value = '10'; }
+    } else {
+        /* POSITION etc: Kd 0~1 */
+        kdLabelEl.textContent = 'Kd 微分增益（0~1）';
+        kdSlider.max = '1';
+        kdSlider.step = '0.001';
+    }
+    /* refresh slider display */
+    kdSlider.dispatchEvent(new Event('input'));
+}
+
 function encode() {
     const mode = parseInt(modeEl.value);
     const targetRad = getTargetRad();
@@ -426,7 +452,9 @@ function encode() {
     const kpClamped = Math.min(65535, Math.max(0, kpRaw));
     const kpLo = kpClamped & 0xFF;
     const kpHi = (kpClamped >> 8) & 0xFF;
-    const kdRaw = Math.round(kdFloat / KD_DEC);
+    /* byte[7] 编码：SPEED 模式用 Ki=value/(KD_DEC*KI_GAIN), 其他模式用 Kd=value/KD_DEC */
+    const kdDecoderScale = (mode === 2) ? (KD_DEC * KI_GAIN) : KD_DEC;
+    const kdRaw = Math.round(kdFloat / kdDecoderScale);
     const kdClamped = Math.min(255, Math.max(0, kdRaw));
 
     const payload = [
@@ -482,8 +510,10 @@ kpSlider.addEventListener('input', () => {
 
 kdSlider.addEventListener('input', () => {
     const v = parseFloat(kdSlider.value);
-    kdValEl.textContent = v.toFixed(3);
-    const raw = Math.round(v / KD_DEC);
+    const mode = parseInt(modeEl.value);
+    kdValEl.textContent = (mode === 2) ? v.toFixed(2) : v.toFixed(3);
+    const decoderScale = (mode === 2) ? (KD_DEC * KI_GAIN) : KD_DEC;
+    const raw = Math.round(v / decoderScale);
     kdRawEl.textContent = toHex(Math.min(255, Math.max(0, raw)), 2) + ` (${Math.min(255, Math.max(0, raw))})`;
     encode();
 });
