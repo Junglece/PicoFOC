@@ -44,6 +44,7 @@
 /* 控制帧解码系数（原始整型 → float） */
 #define KP_DEC_SCALE     (0.00015259f)   /* 10.0 / 65535 */
 #define KD_DEC_SCALE     (0.00392157f)   /*  1.0 / 255   */
+#define KI_GAIN_MULT     (10.0f)         /* spd_ki 额外增益：data[7]=0xFF → Ki=10.0 */
 
 /* ================================================================
  *  内部状态
@@ -93,7 +94,7 @@ static void DecodeCommand(const uint8_t data[8], MotorCommand_t *cmd)
 
     /* ---- 位置环 Kd / 速度环 Ki：uint8 (data[7]) ---- */
     cmd->pos_kd = (float)data[7] * KD_DEC_SCALE;
-    cmd->spd_ki = (float)data[7] * KD_DEC_SCALE;
+    cmd->spd_ki = (float)data[7] * KD_DEC_SCALE * KI_GAIN_MULT;
 }
 
 /* ================================================================
