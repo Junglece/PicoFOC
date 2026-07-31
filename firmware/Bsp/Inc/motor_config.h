@@ -24,6 +24,17 @@
 #define SPEED_LIMIT_RPM     2000.0f
 
 /**
+ * @brief 速度模式软启动斜率 (rpm/s)
+ *
+ * 限制 target_speed 每秒最大变化量，防止指令跳变导致电流冲击。
+ * 每 1ms 控制周期步进 = SPEED_RAMP_RPM_S / 1000。
+ *
+ * 例如：从 0→2000 rpm 需要 2000/500 = 4 秒。
+ * 设为 0 可禁用软启动（target_speed 立即跟随指令）。
+ */
+#define SPEED_RAMP_RPM_S    500.0f
+
+/**
  * @brief 电角度前馈补偿延迟时间 (s)
  *
  * 补偿从 AS5600 角度采样到 PWM 输出实际生效之间的总延迟。

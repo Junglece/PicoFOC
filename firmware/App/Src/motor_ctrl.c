@@ -32,6 +32,7 @@ void Motor_Loop(void)
 {
     static MotorMode_t   g_mode     = MOTOR_MODE_STANDBY;    /**< 当前运行模式 */
     static uint16_t      g_comms_timeout = 0;                /**< 通信超时计数器 */
+    static float         g_speed_desired = 0.0f;             /**< 速度指令目标（rpm），target_speed 斜坡逼近 */
 
     MotorCommand_t       cmd;
     uint8_t              new_cmd    = MotorMsg_PollCommand(&cmd);
@@ -68,10 +69,14 @@ void Motor_Loop(void)
             if (cmd.mode == MOTOR_MODE_STANDBY && g_mode != MOTOR_MODE_STANDBY)
             {
                 FOC_Disable(&Motor);
+                g_speed_desired    = 0.0f;
+                Motor.target_speed = 0.0f;
                 LED_SetPattern(LED_PATTERN_HEARTBEAT);
             }
             else if (cmd.mode != MOTOR_MODE_STANDBY && g_mode == MOTOR_MODE_STANDBY)
             {
+                /* 从待机恢复时，从当前实际转速起步（避免斜坡从旧值起跑） */
+                Motor.target_speed = Motor.speed;
                 FOC_Enable(&Motor);
             }
 
@@ -83,9 +88,9 @@ void Motor_Loop(void)
                 break;
 
             case MOTOR_MODE_SPEED:
-                Motor.target_speed = cmd.target * RAD_S_TO_RPM;
-                Motor.target_speed = DATA_limit(Motor.target_speed,
-                                                  -SPEED_LIMIT_RPM, SPEED_LIMIT_RPM);
+                g_speed_desired  = cmd.target * RAD_S_TO_RPM;
+                g_speed_desired  = DATA_limit(g_speed_desired,
+                                              -SPEED_LIMIT_RPM, SPEED_LIMIT_RPM);
                 FOC_SetSpdExtPID(&Motor, cmd.spd_kp, cmd.spd_ki, 0.0f, Motor.Umax);
                 break;
 
@@ -120,6 +125,8 @@ void Motor_Loop(void)
         {
             FOC_Disable(&Motor);
             g_mode = MOTOR_MODE_STANDBY;
+            g_speed_desired    = 0.0f;
+            Motor.target_speed = 0.0f;
             LED_SetPattern(LED_PATTERN_HEARTBEAT);
         }
     }
@@ -140,6 +147,18 @@ void Motor_Loop(void)
         break;
 
     case MOTOR_MODE_SPEED:
+        /* 软启动：每周期把 target_speed 往 g_speed_desired 拉一步
+         * SPEED_RAMP_RPM_S=0 时 step=0，退化为直通（编译器优化掉） */
+        {
+            float step = SPEED_RAMP_RPM_S / Motor.rate;  /* rpm/周期 */
+            float err  = g_speed_desired - Motor.target_speed;
+            if (err > step)
+                Motor.target_speed += step;
+            else if (err < -step)
+                Motor.target_speed -= step;
+            else
+                Motor.target_speed = g_speed_desired;
+        }
         FOC_SpdCtrl_Ext(&Motor);
         break;
 
